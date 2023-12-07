@@ -9,6 +9,8 @@ setwd("C:/Users/usuario/Downloads/EC349")
 
 #Load Libraries
 install.packages(c("tidytext", "dplyr", "tm", "stringr"))
+install.packages("randomForest")
+library(randomForest)
 library(tidytext)
 library(dplyr)
 library(tm)
@@ -28,7 +30,7 @@ library(glue)
 
 
 
-#ggs
+
 
 
 #Load the Data. In this work, it was decided that the smaller versions of the datasets will be used as the original versions were all too big for the computer to work with efficiently. 
@@ -47,7 +49,7 @@ checkin_data  <- stream_in(file("yelp_academic_dataset_checkin.json")) #note tha
   #As this is a huge amount of data, it is possible some errors or missing values are present so we need to "clean up" the data. Using these we see were are these missing values and how many there are. 
   
   
-## Business Data
+##Business Data
 summary(business_data)
 head(business_data)
 sapply(business_data, function(x) sum(is.na(x)))
@@ -105,7 +107,7 @@ business_data <- business_data[, !(names(business_data) %in% c("latitude", "long
 
 
 
-## Review Data
+##Review Data
 summary(review_data_small)
 head(review_data_small)
 sapply(review_data_small, function(x) sum(is.na(x)))
@@ -113,7 +115,7 @@ sapply(review_data_small, function(x) sum(is.na(x)))
 
 
 
-## User Data
+##User Data
 summary(user_data_small)
 head(user_data_small)
   #There is a big section called "compliments" in this dataset, detailing the number of compliments that this user has received- a way in which yelp lets other users send some, as yelp says: "good vibes" to other users. This is unnecessary, as the model wants to know how to predict reviews, while the compliments are something specific to how other people feel about the User's profile and not about how reviews are done. Whis could in the end affect the model, but its something unnecessary for us (based on our previous work in the business understanding and analytical approach sections)
@@ -138,22 +140,20 @@ user_data_small <- user_data_small %>%
   )
 
 
-## Tips Data
+##Tips Data
 summary(tip_data)
 head(tip_data)
 sapply(tip_data, function(x) sum(is.na(x)))
 #There is no need for the date and the compliment count sections. there's at most 6 compliments on a tip, which is not only not significant but also has no direct effect on how a user is to review an establishment. 
 tip_data <- tip_data[, !colnames(tip_data) %in% c("date", "compliment_count")]
 
-## Check-in Data
+##Check-in Data
 summary(checkin_data)
 head(checkin_data)
 sapply(checkin_data, function(x) sum(is.na(x)))
 #looking at the data provided by this dataset, it is a struggle to see if it would be useful for the model, as it only presents the dates for user log-ins which are not relevant to the reviews.
 
-
-
-
+#We separate the review data into a test and training data sets, which will serve as the base for the merging of other dataset's variables into them.
 set.seed(1)
 a <- createDataPartition(review_data_small$stars, p = 0.4, list = FALSE)
 training_data <- review_data_small[-sample(a, size = 10000), ]
@@ -162,36 +162,21 @@ test_data <- review_data_small[sample(a, size = 10000), ]
 nrow(training_data)
 nrow(test_data)
 
+#we decided to make the data set smaller as the large size before did not allow for some analysis later. 
 training_data <- training_data[sample(1:(nrow(training_data)), size = 80000, replace = FALSE), ]
 
 
 
 
-
+#the next section is where, after multiple attempts at developing a linear model with the variables in the dataset until now, we attempt to examine the text of the reviews itself. The best way to examine this was determined to be sentiment analysis (which was raised as an option when reading previous literature in the subject.)
+#Sentiment analysis is a way to identify how a person feels when writing a text, by assigning values to certain words. For example, words used for excitedly showing happiness like "ecstatic" will have a high POSITIVE score, while something like "disappointing" will have a negative score. based on this, we sum up a score. This score could potentially be used to predict if a user will assign the business a high or lower score rating. 
+#Using three sentiment lexicons (all three were options from some websites teaching how to do sentiment analysis)
 
 install.packages("textdata", repos = 'http://cran.us.r-project.org')
 
 get_sentiments("afinn")
 get_sentiments("bing")
 get_sentiments("nrc")
-
-
-merged_data_text$afinn<- merged_data_text %>% 
-  cross_join(get_sentiments("afinn")) %>% 
-  group_by(text) %>% 
-  summarise(sentiment = sum(value)) %>% 
-  mutate(method = "AFINN")
-afinn_score <- merged_data_text %>%
-  unnest_tokens(word, text) %>%
-  inner_join("AFINN", by = "word") %>%
-  group_by(index = row_number()) %>%
-  summarise(afinn_score = sum(score, na.rm = TRUE))
-
-
-merged_data_text <- merged_data_text %>%
-  left_join("affin", by = c(word = "word")) %>%
-  group_by(text) %>%
-  summarise(afinn_score = sum(score, na.rm = TRUE))
 
 
 afinn_lexicon <- get_sentiments("afinn")
@@ -216,6 +201,11 @@ nrc_lexicon <- nrc_lexicon %>%
 
 
 
+
+
+
+#here, we add columns to both the train and test datasets that detail the score they get from each lexicon analysis. 
+
 training_data <- training_data %>%
   rowwise() %>%
   mutate(afinn_score = sum(afinn_lexicon$value[afinn_lexicon$word %in% unlist(strsplit(text, " "))]))
@@ -226,6 +216,7 @@ training_data <- training_data %>%
   rowwise() %>%
   mutate(ncr_score = sum(nrc_lexicon$nrc_numeric[nrc_lexicon$word %in% unlist(strsplit(text, " "))]))
 
+
 test_data <- test_data %>%
   rowwise() %>%
   mutate(afinn_score = sum(afinn_lexicon$value[afinn_lexicon$word %in% unlist(strsplit(text, " "))]))
@@ -237,7 +228,7 @@ test_data <- test_data %>%
   mutate(ncr_score = sum(nrc_lexicon$nrc_numeric[nrc_lexicon$word %in% unlist(strsplit(text, " "))]))
 
 
-
+#Finally, we will create a simple linear model using these newly created variables, to examine their relationship 
 model <- lm(stars ~ afinn_score + bing_score + ncr_score, data = training_data)
 summary(model)
 
@@ -264,8 +255,7 @@ print(paste("Optimal Lambda:", best_lambda))
 plot(lasso_model)
 X_test <- model.matrix(stars ~ afinn_score + bing_score + ncr_score, data = test_data)
 predictions <- predict(lasso_model, newx = X_test, s = best_lambda)
-mae <- mean(abs(predictions - test_data$stars))
-print(paste("Mean Absolute Error:", mae))
+mean(abs(predictions - test_data$stars))
 
 
 
@@ -316,9 +306,6 @@ merged_data <- merged_data %>%
   select(-one_of(eliminate_columns))
 merged_data$attributes$BusinessParking <- NULL
 merged_data$date <- NULL
-merged_data$date <- NULL
-
-
 
 merged_data <- merged_data[complete.cases(merged_data[, c("Business_Average_Stars", "user_average_stars_given", "review_count")]), ]
 
@@ -450,7 +437,6 @@ merged_test_data <- merged_test_data %>%
   select(-one_of(eliminate_columns))
 merged_test_data$attributes$BusinessParking <- NULL
 merged_test_data$date <- NULL
-merged_test_data$date <- NULL
 
 
 
@@ -552,47 +538,17 @@ merged_test_data <- merged_test_data %>%
   mutate(ncr_score = sum(nrc_lexicon$nrc_numeric[nrc_lexicon$word %in% unlist(strsplit(text, " "))]))
 merged_test_data$text <- NULL
 
-#checking for Multicollinearity
-cor(merged_data, method = "pearson")
-#In general, we can say that there is no multicolinearity in this dataset, as there is no coefficient above 0.7
 
-Modelv0 <- lm(stars ~ Business_Average_Stars + user_average_stars_given + review_count, data = merged_data)
-summary(Modelv0)
-
-
-Modelv1 <- lm(stars ~ Business_Average_Stars + user_average_stars_given + review_count + afinn_score + ncr_score + bing_score, data = merged_data)
-summary(Modelv1)
-#Looking at the summary, we determine that the p-value of this model is: p-value < 2.2e-16. This is a very small p-value, which tells us that at least one of our predictor variables is significantly related to the "Stars" variable. 
-  #However, the r-squared value is extremely low, at 0.2417. Meaning that only 24% of the variation can be explained by our model. 
-#We now use the merged dataset to create a linear model, in the first attempt to predict reviews. 
-
-#Fitting the Lasso model
-set.seed(1)
-X <- model.matrix(stars ~ Business_Average_Stars + user_average_stars_given + review_count, data = merged_data)
+X <- model.matrix(stars ~ useful + funny + cool + is_open + user_average_stars_given + bing_score + afinn_score + ncr_score + user_review_count +Business_Average_Stars, data = merged_data)
 Y <- merged_data$stars
 
-# Fit Lasso model
-lasso_model1 <- cv.glmnet(X, Y, alpha = 1)  # alpha = 1 corresponds to Lasso
-control = trainControl(method = "cv", number = 5)
-lasso_model1 = train(X, Y, method = "glmnet", trControl = control)
-lasso_model1
-
-
-
-
-
-
-X <- model.matrix(stars ~ Business_Average_Stars + user_average_stars_given + review_count + afinn_score + bing_score + ncr_score, data = merged_data)
-Y <- merged_data$stars
-
-lasso_model2 <- cv.glmnet(X, Y, alpha = 1)
-best_lambda <- lasso_model2$lambda.min
+lasso_model <- cv.glmnet(X, Y, alpha = 1)
+best_lambda <- lasso_model$lambda.min
 print(paste("Optimal Lambda:", best_lambda))
-plot(lasso_model2)
-X_test <- model.matrix(stars ~ Business_Average_Stars + user_average_stars_given + review_count + afinn_score + bing_score + ncr_score, data = merged_test_data)
-predictions <- predict(lasso_model2, newx = X_test, s = best_lambda)
-mae <- mean(abs(predictions - merged_test_data$stars))
-print(paste("Mean Absolute Error:", mae))
+plot(lasso_model)
+X_test <- model.matrix(stars ~ user_average_stars_given + bing_score + afinn_score + user_review_count +Business_Average_Stars, data = merged_test_data)
+predictions <- predict(lasso_model, newx = X_test, s = best_lambda)
+mean(abs(predictions - merged_test_data$stars))
 
 
 
@@ -602,28 +558,51 @@ print(paste("Mean Absolute Error:", mae))
 
 
 
+###Now that we have all the data prepared again, we can create a model. However, there are a lot of variables that could hold different amounts of explanatory power in star prediction. Getting the ones with the highest explanatory power is the aim of this project, and as such we shall create a random forest model to plot and view the importance of each variable. 
+#this section, we need to unnest the attributes section momentarily as it was, in a way, "a dataset in another dataset". 
+#To get the importance of each variable, we can use the random forest model. 
+
+merged_data <- tidyr::unnest(merged_data, cols = (names(merged_data)))
+merged_test_data <- tidyr::unnest(merged_test_data, cols = (names(merged_test_data)))
+Target_Variable <- "stars"
+
+#Create the random forest model
+rf_model <- randomForest(as.factor(get(Target_Variable)) ~ . , data = merged_data, ntree = 100)
+
+#View and plot the importance of each variable 
+importance(rf_model)
+varImpPlot(rf_model)
 
 
+#Using the 5 most important variables, we create a final linear regression model. We see that there is an r-squared value of 0.43, which means this model explains 43% of the variation. 
+Modelv2 <- lm(stars ~ user_average_stars_given + bing_score + afinn_score + user_review_count +Business_Average_Stars , data = merged_data)
+summary(Modelv2)
 
 
-
-set.seed(1)
-X <- model.matrix(stars ~ Business_Average_Stars + user_average_stars_given + review_count + afinn_score + ncr_score + bing_score, data = merged_data)
+X <- model.matrix(stars ~ useful + funny + cool + afinn_score + bing_score + ncr_score + review_count + is_open + BusinessAcceptsCreditCards + BikeParking + RestaurantsPriceRange2 + RestaurantsTakeOut + RestaurantsDelivery + OutdoorSeating + RestaurantsReservations + GoodForKids + WiFi_numeric + Business_Average_Stars + open_on_weekends + user_review_count + user_profile_usefulness + user_profile_funny + user_profile_coolness + user_average_stars_given + elite_years + numeric_postal_code, data = merged_data)
 Y <- merged_data$stars
 
-# Fit Lasso model
-lasso_model2 <- cv.glmnet(X, Y, alpha = 1)  # alpha = 1 corresponds to Lasso
-control = trainControl(method = "cv", number = 5)
-lasso_model2 = train(X, Y, method = "glmnet", trControl = control)
-lasso_model2
+lasso_model <- cv.glmnet(X, Y, alpha = 1)
+best_lambda <- lasso_model$lambda.min
+print(paste("Optimal Lambda:", best_lambda))
+plot(lasso_model)
+X_test <- model.matrix(stars ~ useful + funny + cool + afinn_score + bing_score + ncr_score + review_count + is_open + BusinessAcceptsCreditCards + BikeParking + RestaurantsPriceRange2 + RestaurantsTakeOut + RestaurantsDelivery + OutdoorSeating + RestaurantsReservations + GoodForKids + WiFi_numeric + Business_Average_Stars + open_on_weekends + user_review_count + user_profile_usefulness + user_profile_funny + user_profile_coolness + user_average_stars_given + elite_years + numeric_postal_code, data = merged_test_data)
+predictions <- predict(lasso_model, newx = X_test, s = best_lambda)
+mean(abs(predictions - merged_test_data$stars))
 
 
-merged_data_text <- merged_data_text %>%
-  sample_n(size = 90000, replace = FALSE, seed = 1)
+#the mean absolute error in this model goes down to a 0.82, which is lower than previous iterations of the model. It says there the model's predictions are off by 0.8 stars generally. 
 
 
 
+set.seed(1) 
+control <- trainControl(method = "cv", number = 10)
+predictions <- predict(rf_model, newdata = merged_test_data)
+merged_test_data$starsfactor <- as.factor(merged_test_data$stars)
+confusion_matrix <- confusionMatrix(predictions, merged_test_data$starsfactor)
+print(confusion_matrix)
 
+confusion_matrix$overall["Accuracy"]
 
 
 
@@ -631,100 +610,3 @@ merged_data_text <- merged_data_text %>%
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-head(merged_data)
-Model_Attributes <- lm(stars ~ attributes$BikeParking + attributes$RestaurantsPriceRange2 + attributes$RestaurantsTakeOut + attributes$RestaurantsDelivery + attributes$WiFi_numeric + open_on_weekends, data = merged_data)
-summary(Model_Attributes)
-#The attributes of a restaurant have nothing to do with the rating (0.01068 r-squared value)
-
-
-Model_Users <- lm(stars ~ user_profile_usefulness  + user_average_stars_given + elite_years, data = merged_data)
-summary(Model_Users)
-#profile usefulness and elite status is not a relevant variable at all, implying that being an active, engaged and highly rated reviewer does not influence the score one would give to an establishment. 
-
-merged_data
-
-
-
-#Until now, it seems clear that the best model so far has been "Model_v0". IN oredr to continue exploring the data in it, we will be exploring and eliminating any outliers. 
-merged_data_2 <- merged_data
-Q1 <- quantile(merged_data$Business_Average_Stars, 0.25)
-Q3 <- quantile(merged_data$Business_Average_Stars, 0.75)
-IQR <- Q3 - Q1
-lower_bound <- Q1 - 1.5 * IQR
-upper_bound <- Q3 + 1.5 * IQR
-outliers <- merged_data$Business_Average_Stars < lower_bound | merged_data$Business_Average_Stars > upper_bound
-merged_data_2 <- merged_data_2[!outliers, ]
-
-
-
-
-
-
-subset_data <- merged_data[sample(nrow(merged_data), 2000), ]
-
-
-
-
-
-
-
-
-#Now, we will try another approach: Using the text in the reviews and comparing it to the "tips" that were left on the business.
-#the logic behind this is, if people follow the tips (what is best to order or avoid for customers), will that be an indication that their reviews are going to increase in value?
-
-set.seed(1)  
-sample_size <- 10000
-
-
-sample_training_data <- training_data[sample(nrow(training_data), size = sample_size, replace = TRUE), ]
-sample_tip_data <- tip_data[sample(nrow(tip_data), size = sample_size, replace = TRUE), ]
-merged_text_data <- merge(sample_training_data, sample_tip_data, by = "business_id", all.x = TRUE)
-summary(is.na(merged_text_data))
-selected_columns <- c("stars", "text.x", "text.y")
-merged_text_data <- merged_text_data[selected_columns]
-
-merged_text_data$common_words_count <- sapply(1:nrow(merged_text_data), function(i) {
-  words_x <- strsplit(as.character(merged_text_data$text.x[i]), "\\s")[[1]]
-  words_y <- strsplit(as.character(merged_text_data$text.y[i]), "\\s")[[1]]
-  common_words <- intersect(words_x, words_y)
-  length(common_words)
-})
-
-cor(merged_text_data$stars, merged_text_data$common_words_count)
