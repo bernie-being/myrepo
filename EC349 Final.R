@@ -10,6 +10,10 @@ setwd("C:/Users/usuario/Downloads/EC349")
 #Load Libraries
 install.packages(c("tidytext", "dplyr", "tm", "stringr"))
 install.packages("randomForest")
+install.packages(c("knitr", "kableExtra", "webshot"))
+library(knitr)
+library(kableExtra)
+library(webshot)
 library(randomForest)
 library(tidytext)
 library(dplyr)
@@ -198,12 +202,6 @@ nrc_lexicon <- nrc_lexicon %>%
   mutate(nrc_numeric = case_when(sentiment %in% names(sentiment_scores) ~ sentiment_scores[sentiment], TRUE ~ 0))
 
 
-
-
-
-
-
-
 #here, we add columns to both the train and test datasets that detail the score they get from each lexicon analysis. 
 
 training_data <- training_data %>%
@@ -229,71 +227,46 @@ test_data <- test_data %>%
 
 
 #Finally, we will create a simple linear model using these newly created variables, to examine their relationship 
-model <- lm(stars ~ afinn_score + bing_score + ncr_score, data = training_data)
-summary(model)
+LinearModelv1 <- lm(stars ~ afinn_score + bing_score + ncr_score, data = training_data)
+summary(LinearModelv1)
 
+#use the test data we have to see if the model is working correctly and will predict well. 
 
-
-
-
-
-
-
-
-
-
-
-
-
+predictions <- predict(LinearModelv1, newdata = test_data)
+data.frame( R2 = R2(predictions, test_data$stars),
+            RMSE = RMSE(predictions, test_data$stars),
+            MAE = MAE(predictions, test_data$stars))
+#Thile this is a good start, a high error and a low explanatory power hold this model back.
+#create a lasso model with the same variables in order to confirm values and errors. 
 
 X <- model.matrix(stars ~ afinn_score + bing_score + ncr_score, data = training_data)
 Y <- training_data$stars
 
-lasso_model <- cv.glmnet(X, Y, alpha = 1)
-best_lambda <- lasso_model$lambda.min
-print(paste("Optimal Lambda:", best_lambda))
-plot(lasso_model)
+lasso_modelv1 <- cv.glmnet(X, Y, alpha = 1)
+best_lambda <- lasso_modelv1$lambda.min
+plot(lasso_modelv1)
 X_test <- model.matrix(stars ~ afinn_score + bing_score + ncr_score, data = test_data)
-predictions <- predict(lasso_model, newx = X_test, s = best_lambda)
+predictions <- predict(lasso_modelv1, newx = X_test, s = best_lambda)
 mean(abs(predictions - test_data$stars))
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#create a data set with the training data as a base, adding other data and values that might be useful and found in other sets. 
 
 merged_data <- merge(training_data, business_data, by = "business_id", all.x = TRUE, all.y = FALSE)
 merged_data <- merge(merged_data, user_data_small, by = "user_id", all.x = TRUE, all.y = FALSE)
 
+hist(merged_data$stars, main = "Star Score Frequency Distribution", xlab = "Stars", ylab = "Frequency")
 
-
+#Data set is incredibly large and must be trimmed down for other analysis later on (this step came after noticing that sentiment analysis would take a long time with such a large data set)
+#Decrease size by only using data for restaurants, to trim the set down but also focus this analysis in one category to avoid problems (variables that affect the rating of a hair salon might not be the same of a restaurant, for example.)
 categories_list <- strsplit(as.character(merged_data$categories), ", ")
 all_categories <- unlist(strsplit(as.character(merged_data$categories), ", "))
 all_categories <- all_categories[all_categories != ""]
 top_category <- names(sort(table(all_categories), decreasing = TRUE)[1])
 
-# Keep only the rows with the top "category". We cannotanalyse the reviews left on restaurants the same way we analyse beauty salons or hotels as there are different parameters, works used, and people going to these. using the largedt pool of data (the one from reviews from restaurants) will bring a better and more accurate result. 
+# Keep only the rows with the top "category". We cannot analyse the reviews left on restaurants the same way we analyse beauty salons or hotels as there are different parameters, works used, and people going to these. using the largedt pool of data (the one from reviews from restaurants) will bring a better and more accurate result. 
 merged_data <- merged_data[sapply(strsplit(as.character(merged_data$categories), ", "), function(lst) top_category %in% lst), ]
-
 
 
 merged_data$numeric_postal_code <- as.numeric(gsub("[^0-9]", "", merged_data$postal_code))
@@ -411,8 +384,7 @@ merged_data$text <- NULL
 
 
 
-
-
+#Merged_data will be used as the training dataset, as it is based on the values located in "training_data". Due to this, we use "testing_data" and add the same merged data to this as we did with the other dataset, to create a testing dataset that can be used. 
 
 merged_test_data <- merge(test_data, business_data, by = "business_id", all.x = TRUE, all.y = FALSE)
 merged_test_data <- merge(merged_test_data, user_data_small, by = "user_id", all.x = TRUE, all.y = FALSE)
@@ -422,22 +394,18 @@ all_categories <- unlist(strsplit(as.character(merged_test_data$categories), ", 
 all_categories <- all_categories[all_categories != ""]
 top_category <- names(sort(table(all_categories), decreasing = TRUE)[1])
 
-# Keep only the rows with the top "category". We cannotanalyse the reviews left on restaurants the same way we analyse beauty salons or hotels as there are different parameters, works used, and people going to these. using the largedt pool of data (the one from reviews from restaurants) will bring a better and more accurate result. 
+# Keep only the rows with the top "category". We cannot analyse the reviews left on restaurants the same way we analyse beauty salons or hotels as there are different parameters, works used, and people going to these. using the largedt pool of data (the one from reviews from restaurants) will bring a better and more accurate result. 
 merged_test_data <- merged_test_data[sapply(strsplit(as.character(merged_test_data$categories), ", "), function(lst) top_category %in% lst), ]
-
-
-
+#To use the postal code as a numeric variable which can be used, we transform it.
 merged_test_data$numeric_postal_code <- as.numeric(gsub("[^0-9]", "", merged_test_data$postal_code))
 #The data set is just too large, and has many columns that are not useful now. After checking that all else is correct, we decided to eliminate the character/non-numeric columns. 
 head(merged_test_data)
 merged_test_data_text <- merged_test_data[c("stars", "text", "user_id", "business_id")]
-
 eliminate_columns <- c("user_id", "business_id", "name", "postal_code", "categories", "review_id")
 merged_test_data <- merged_test_data %>%
   select(-one_of(eliminate_columns))
 merged_test_data$attributes$BusinessParking <- NULL
 merged_test_data$date <- NULL
-
 
 
 merged_test_data <- merged_test_data[complete.cases(merged_test_data[, c("Business_Average_Stars", "user_average_stars_given", "review_count")]), ]
@@ -539,18 +507,36 @@ merged_test_data <- merged_test_data %>%
 merged_test_data$text <- NULL
 
 
-X <- model.matrix(stars ~ useful + funny + cool + is_open + user_average_stars_given + bing_score + afinn_score + ncr_score + user_review_count +Business_Average_Stars, data = merged_data)
+
+
+
+
+LinearModelv2 <- lm(stars ~ useful + funny + cool + is_open + user_average_stars_given +
+                      bing_score + afinn_score + ncr_score + user_review_count + Business_Average_Stars,
+                    data = merged_data)
+
+summary(LinearModelv2)
+residuals(LinearModelv2)
+plot(residuals(LinearModelv2), main = "Residuals Plot", ylab = "Residuals")
+
+#Testing the model
+
+predictions <- predict(LinearModelv2, newdata = merged_test_data)
+data.frame( R2 = R2(predictions, merged_test_data$stars),
+            RMSE = RMSE(predictions, merged_test_data$stars),
+            MAE = MAE(predictions, merged_test_data$stars))
+
+#Lasso model to verify
+
+X <- model.matrix(stars ~ useful + funny + cool + is_open + user_average_stars_given + bing_score + afinn_score + ncr_score + user_review_count + Business_Average_Stars, data = merged_data)
 Y <- merged_data$stars
 
-lasso_model <- cv.glmnet(X, Y, alpha = 1)
-best_lambda <- lasso_model$lambda.min
-print(paste("Optimal Lambda:", best_lambda))
-plot(lasso_model)
-X_test <- model.matrix(stars ~ user_average_stars_given + bing_score + afinn_score + user_review_count +Business_Average_Stars, data = merged_test_data)
-predictions <- predict(lasso_model, newx = X_test, s = best_lambda)
+lasso_modelv2 <- cv.glmnet(X, Y, alpha = 1)
+best_lambda <- lasso_modelv2$lambda.min
+plot(lasso_modelv2)
+X_test <- model.matrix(stars ~ useful + funny + cool + is_open + user_average_stars_given + bing_score + afinn_score + ncr_score + user_review_count + Business_Average_Stars, data = merged_test_data)
+predictions <- predict(lasso_modelv2, newx = X_test, s = best_lambda)
 mean(abs(predictions - merged_test_data$stars))
-
-
 
 
 
@@ -575,38 +561,51 @@ varImpPlot(rf_model)
 
 
 #Using the 5 most important variables, we create a final linear regression model. We see that there is an r-squared value of 0.43, which means this model explains 43% of the variation. 
-Modelv2 <- lm(stars ~ user_average_stars_given + bing_score + afinn_score + user_review_count +Business_Average_Stars , data = merged_data)
-summary(Modelv2)
+LinearModelv3 <- lm(stars ~ user_average_stars_given + bing_score + afinn_score + user_review_count +Business_Average_Stars , data = merged_data)
+summary(LinearModelv3)
 
+predictions <- predict(LinearModelv3, newdata = merged_test_data)
+data.frame( R2 = R2(predictions, merged_test_data$stars),
+            RMSE = RMSE(predictions, merged_test_data$stars),
+            MAE = MAE(predictions, merged_test_data$stars))
+
+
+#Lasso model to verify
 
 X <- model.matrix(stars ~ useful + funny + cool + afinn_score + bing_score + ncr_score + review_count + is_open + BusinessAcceptsCreditCards + BikeParking + RestaurantsPriceRange2 + RestaurantsTakeOut + RestaurantsDelivery + OutdoorSeating + RestaurantsReservations + GoodForKids + WiFi_numeric + Business_Average_Stars + open_on_weekends + user_review_count + user_profile_usefulness + user_profile_funny + user_profile_coolness + user_average_stars_given + elite_years + numeric_postal_code, data = merged_data)
 Y <- merged_data$stars
 
-lasso_model <- cv.glmnet(X, Y, alpha = 1)
-best_lambda <- lasso_model$lambda.min
-print(paste("Optimal Lambda:", best_lambda))
-plot(lasso_model)
+lasso_modelv3 <- cv.glmnet(X, Y, alpha = 1)
+best_lambda <- lasso_modelv3$lambda.min
+plot(lasso_modelv3)
 X_test <- model.matrix(stars ~ useful + funny + cool + afinn_score + bing_score + ncr_score + review_count + is_open + BusinessAcceptsCreditCards + BikeParking + RestaurantsPriceRange2 + RestaurantsTakeOut + RestaurantsDelivery + OutdoorSeating + RestaurantsReservations + GoodForKids + WiFi_numeric + Business_Average_Stars + open_on_weekends + user_review_count + user_profile_usefulness + user_profile_funny + user_profile_coolness + user_average_stars_given + elite_years + numeric_postal_code, data = merged_test_data)
-predictions <- predict(lasso_model, newx = X_test, s = best_lambda)
+predictions <- predict(lasso_modelv3, newx = X_test, s = best_lambda)
 mean(abs(predictions - merged_test_data$stars))
 
 
 #the mean absolute error in this model goes down to a 0.82, which is lower than previous iterations of the model. It says there the model's predictions are off by 0.8 stars generally. 
 
 
+#For the purposes of the final report and easy visualization on the results of each model, we will create a table that shouws the summary data from each model. 
+titles <- c("Version 1", "Version 2", "Version 3")
 
-set.seed(1) 
-control <- trainControl(method = "cv", number = 10)
-predictions <- predict(rf_model, newdata = merged_test_data)
-merged_test_data$starsfactor <- as.factor(merged_test_data$stars)
-confusion_matrix <- confusionMatrix(predictions, merged_test_data$starsfactor)
-print(confusion_matrix)
+residual_standard_error <- c(1.326, 1.029, 1.055)
+multiple_r_squared <- c(0.1988, 0.4605, 0.4336)
+adjusted_r_squared <- c(0.1988, 0.46, 0.4334)
+p_value <- c("< 2.2e-16", "< 2.2e-16", "< 2.2e-16")
+r2 <- c(0.2141986, 0.441894, 0.4383494)
+rmse <- c(1.31752, 1.054521, 1.056934)
+mae <- c(1.114106, 0.8243429, 0.8269731)
 
-confusion_matrix$overall["Accuracy"]
+SummaryDataSet <- data.frame(
+  Version = titles,
+  Residual_Standard_Error = c(1.326, 1.029, 1.055),
+  Multiple_R_Squared = c(0.1988, 0.4605, 0.4336),
+  Adjusted_R_Squared = c(0.1988, 0.46, 0.4334),
+  P_Value = c("< 2.2e-16", "< 2.2e-16", "< 2.2e-16"),
+  R2 = c(0.2141986, 0.441894, 0.4383494),
+  RMSE = c(1.31752, 1.054521, 1.056934),
+  MAE = c(1.114106, 0.8243429, 0.8269731))
 
-
-
-
-
-
-
+SummaryTable <- kable(SummaryDataSet, "html") %>% kable_styling("striped", full_width = FALSE)
+print(SummaryTable)

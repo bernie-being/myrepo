@@ -4,68 +4,59 @@
 
 ***Name: Bernardo Serrano***
 
-Yelp is an online platform where users can write reviews that consist of a star rating out of five stars,
-
-Star reviews are a way in which we attempt to quantify and standardize something as subjective as opinions. they are a quick and understandable way in which people can communicate how good of an experience they had, usually with five stars being the highest score and 0 being the worst. For this reason, a good star rating can be pivotal for businesses that aim to attract customers, which makes Yelp - an online review database and website - important. In this analysis, we aim to understand what motivates a user to choose one specific star rating over others, as understanding what influences star ratings might help business orders when trying to elevate their establishment reviews. To do this, this analysis uses the data provided by Yelp in various data sets, which detail information on businesses, user reviews, user profiles, check-ins, and user tips.
-
-This analysis followed the CRISP-DM methodology, which urged us to start by "understanding the business problem".
-
-As stated above, what this analysis aimed to extrapolate from the data was an understanding of what factors influence users to choose any given score when reviewing, as that would help in kowing what leads to high scoring reviews. The data gives us insight in many of the specifics of each business - from the type of establishment to their operational schedule - as well as the specifics of each review and user. Examining the details of each business as well as the specific words of the reviews seem to be the best way this data can give relevant information.
-
-The data sets used included big amounts of data, and in order for the computer to be able to process it all in an efficient matter a lot of it was trimmed or simplified down. The smallet versions of the sets detailing information about user profiles and reviews were used for this reason. The business information data set included many details of each establishment: their name, address and other location details, what category of establishment it fits, attributes of this specific environment, it's average star rating, and operational schedule. Most of these were cleaned up, by turning their data into numerical binary YES/NO (1/0) vectors for easier numerical analysis. Additionally, some data was simplified (operational schedule translated into a simple vector detailing if the establishment closed on weekends). Finally, some unnecessary or repeated variables were eliminated, like the different location variables or attributes columns that did not have enough data and most of them were empty. Review data was largely untouched, in compasiron to the user data, as many columns were deemed not necessary for the analysis (information about how old the user profile is or how many compliments they provide others). To top it all off,
-
-The data in "tip_data" and "checkin_data" was largely discarded as it was determined to not be important enough for the analysis, as information about how often a user uses the app or special tips about establishments is not important for scoring a review. After this was done, the remaining data was compiled in a merged data set that included all relevant variables.
-
-Additionaly, after unsuccessful first attempts as creating a linear model, a user sentiment scores are extracted by performing sentiment analysis on the text of each review. This is a process to extract what the writer was feeling when writing a text by comparing the vocabulary used with lexicons.By assigning a sentiment score to each review, it may prove that the mood and/or specifics of the review experience are influential. 
-
-A linear model using only the sentiment scores is performed, yielding a small p-valua and a Multiple R-squared of 0.1988, which is not a satisfactory result as the model can only explain 19% of the data. A lasso model was used for comparison, which confirmed a 1.114354 mean average error. 
-
-Once the rest of the rest of the important remaining variables are introduced in the model, we are granted a 0.4336 R-squared value. A lasso model was used with the same variables for comparison, yielding a 0.824702 MAE.
-
-Finally, a random forest model was utilized to compare the importance of these variables and at the same time test the accuracy of a model including all variables. 
-This testing revealed that the top five more important variables in the model are, in order: "user_average_stars_given", "bing_score", "afinn_score", "user_review_count", "Business_Average_Stars". This gives us insight into the more important factors that establishments should take into account if they decide to look at/change their reviews. A lasso model was used with the same variables for comparison, yielding a 0.8273204 MAE, which is higher than the other model, but using far less variables. 
 
 
-In this paper, we analysed the data from the Yelp data sets in order to develop a model that can predict the star scoring for Yelp reviews on a business, specifically on restaurants.Three different methods were used: linear regression, lasso, and random forest. After multiple iterations of data cleaning and preparation, the models identified five key factors that influence a star rating, which businesses must look out for and control.
-Firstly, businesses must look out for frequent yelp users - as being a serial reviewers with more experience in what makes a good restaurant/establishment influences the star rating massively. On the same vein, more positive reviewers are more likely to review new establishments highly, and so avoiding or addressing negative users carefully might raise reviews. The sentiment analysis provided two factors that can be summarized as the sentiment of each reviewer according to how they wrote the review. Influencing the mood of customers once they leave the establishment is crucial for a good review, so businesses must attempt to control this through attitude, service, ambiance or other factors that may influence emotions. Previous establishment performance and also herd mentality also influences star scores - people ar emore likely to review an establishment lower if that establishment's reviews are already down, which means that for businesses a good start and maintaining that good star rating momentum is imperative. 
+**Introduction**
+
+Star reviews are a way in which we attempt to quantify and standardize something as subjective as opinions. they are a quick and understandable way in which people can communicate how good of an experience they had, usually with five stars being the highest score and 0 being the worst. For this reason, a good star rating can be pivotal for businesses that aim to attract customers, which makes Yelp - an online review database and website - important. In this analysis, we aim to understand what motivates a user to choose one specific star rating over others, as understanding this might help business owners when trying to elevate their establishment reviews. The CRISP-DM methodology and three different methods were used: linear regression, lasso, and random forest with data provided by Yelp in various data sets, which detail information on businesses, user reviews, user profiles, check-ins, and user tips.
 
 
+**Analytical Approach**
 
-### 2. Analytic Approach
+As stated above, what this analysis aimed to extrapolate from the data was an understanding of what factors influence users to choose any given score when reviewing, as that would help in knowing what leads to high scoring reviews. The data gives us insight in many of the specifics of each business - from the type of establishment to their operational schedule - as well as the specifics of each review and user. Examining the details of each business as well as the specific words of the reviews seem to be the best way this data can give relevant information. This project aims to extract any variables from the data that may influence star ratings.
 
 
-Call:
-lm(formula = stars ~ afinn_score + bing_score + ncr_score, data = training_data)
+**Data Collection, Distribution, Understanding, and Preparation**
 
-Residuals:
-    Min      1Q  Median      3Q     Max 
--5.3567 -1.0083  0.3187  1.1045  3.2587 
+This analysis used Yelp-provided data. Smaller versions of the sets detailing user profiles and reviews were used for this reason. The review data set had 1398056 observations, which presented many processing complications later on when performing sentiment analysis. Using the "categories" section in the data set, the top categories are identified (shown in figure below), for the top category (Restaurants) to be used in the experiment. Using different categories might influence the model negatively - as the variables that might influence a review for a restaurant are different than variables of a doctor's office. This accomplished the secondary objective of reducing the pool of reviews to analyse, and while it may influence the outcome of the model it is a necessary processing step. It is noticeable that there is a skewed distribution towards either 1 star or five stars. This distribution is very similar to the distribution of star reviews in the larger data set, signifying that it is not a specific attribute to restaurants and the simplified data was accurate.
 
-Coefficients:
-              Estimate Std. Error t value Pr(>|t|)    
-(Intercept)  3.3257912  0.0064961  511.96   <2e-16 ***
-afinn_score  0.0535221  0.0014452   37.03   <2e-16 ***
-bing_score   0.1721907  0.0029632   58.11   <2e-16 ***
-ncr_score   -0.0267937  0.0006197  -43.24   <2e-16 ***
----
-Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+The business information data set included details of each establishment: name, address, location, what category of establishment it fits, specific attributes, average star rating, and operational schedule. Most of these were cleaned by turning their data into numerical variables easier to work with. Additionally, some data was simplified (operational schedule into “is the establishment closed on weekends?”). Finally, some unnecessary or repeated variables were eliminated, like the different location variables or mostly empty attribute columns. 
 
-Residual standard error: 1.326 on 79996 degrees of freedom
-Multiple R-squared:  0.1988,	Adjusted R-squared:  0.1988 
-F-statistic:  6616 on 3 and 79996 DF,  p-value: < 2.2e-16
+Many columns in User data were eliminated, as they were deemed not necessary for the analysis. Finally, data in "tip_data" and "checkin_data" was largely discarded. Information about how often a user uses the app or special tips about establishments is not important for scoring a review. After this was done, the remaining data was compiled in a merged data set that included all relevant variables.
 
-### 3. Data Requirements
 
-### 4. Data Collection
+**Experiment and Modeling**
 
-### 5. Data Understanding
+After unsuccessful first attempts at creating a linear model, user sentiment scores are extracted by performing sentiment analysis on the text of each review. This is a process to extract what the writer was feeling when writing a text by comparing the vocabulary used with lexicons. By assigning a sentiment score to each review, it may prove that the mood and/or specifics of the review experience are influential. 
+The analysis worked through three versions of models. Version One utilized only sentiment analysis scores to predict the star ratings, which showed promising results. The second version included all available variables, which caused concerns for over-fitting and the viability of the data - as the aim of this analysis is to find what influences reviews, narrowing this down to a few variables would be more beneficial for the establishments to manage and control. Finally, this led to a third iteration of the model using the five variables with the most importance in determining star ratings. This was found through a Random Forest model, and later these variables were fitted in a linear and lasso models.
 
-### 6. Data Preparation
 
-### 7. Modelling
+**Experiment Results**
 
-### 8. Evaluation
+The analysis led to the following results, expressed in the tables below. 
 
-### 9. Deploymeny
+Version 1 refers to linear model using only the sentiment scores is performed, yielding a small p-value and a Multiple R-squared of 0.1988, which is not a satisfactory result as the model can only explain 19% of the data. A lasso model was used for comparison, which confirmed a 1.114354 mean average error. However, the Version Two managed to explain 46% of the variation in the star values. Further research in the subject is needed to expand this model, but this analysis narrowed down five variables that explain up to 43% of star scores in reviews through the third version of this model. This third model offered a Mean Average Error of 0.8269731, which while not perfect, is still within one star value of error and could be utilized effectively to predict star scoring. 
 
-### 10. Feedback
+A random forest model was utilized to compare the importance of these variables and at the same time test the accuracy of a model including all variables. 
+
+This testing revealed that the top five more important variables in the model are, in order: 
+
+1. "user_average_stars_given"
+2. "bing_score"
+3. "afinn_score"
+4. "user_review_count"
+5. "Business_Average_Stars".
+
+This gives us insight into the more important factors that establishments should take into account if they decide to look at/change their reviews.
+
+
+**Conclusions**
+
+In this analysis, we predicted the star scores of restaurants using Yelp-provided data, and developed a model that managed to predict accurately within one star of error. From this model, some conclusions can be drawn. Establishments, and more specifically restaurants, that aim to understand what affects their star ratings in Yelp should look at the main 5 variables found in this analysis.
+
+While establishments cannot specifically choose frequent reviewers that give higher stars on average, they can advertise directly to them through the Yelp Ads service to increase their chances. Additionally, it was shown that sentiment/emotions in a reviewer are important when deciding a score, so influencing it through attitude, service, ambiance, and decorations will prove useful. Finally, previous establishment performance and herd mentality also influences star scores - people are more likely to review an establishment lower if that establishment's reviews are already down, which means that for businesses a good start and maintaining that good star rating momentum is imperative. 
+
+While the modelling was successful, it was by no means perfect or exhaustive. Future works in this area may expand on many areas, for example working with a larger data set with a more balanced star distribution - two things that might have influenced the model here. Future work should strive to expand on the variables found today and add to them with more data, in other businesses categories and types to not only relegate this analysis on restaurants. 
+
+### Code / R Script Used
+
