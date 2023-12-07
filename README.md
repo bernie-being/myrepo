@@ -1,3 +1,2 @@
 # myrepo
-rep for testing
-kkk
+This repository is for the EC 349 project
