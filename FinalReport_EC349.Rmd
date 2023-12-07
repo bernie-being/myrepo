@@ -20,6 +20,8 @@ As stated above, what this analysis aimed to extrapolate from the data was an un
 
 This analysis used Yelp-provided data. Smaller versions of the sets detailing user-profiles and reviews were used for this reason. The review data set had 1398056 observations, which presented many processing complications later on when performing sentiment analysis. Using the "categories" section in the data set, the top categories are identified (shown in the figure below), for the top category (Restaurants) to be used in the experiment. Using different categories might influence the model negatively - as the variables that might influence a review for a restaurant are different than the variables of a doctor's office. This accomplished the secondary objective of reducing the pool of reviews to analyze, and while it may influence the outcome of the model it is a necessary processing step. It is noticeable that there is a skewed distribution towards either 1 star or five stars. This distribution is very similar to the distribution of star reviews in the larger data set, signifying that it is not a specific attribute of restaurants and that the simplified data was accurate.
 
+![Category Frequency](CategoryFrequency.png)
+
 The business information data set included details of each establishment: name, address, location, what category of establishment it fits, specific attributes, average star rating, and operational schedule. Most of these were cleaned by turning their data into numerical variables easier to work with. Additionally, some data was simplified (operational schedule into “Is the establishment closed on weekends?”). Finally, some unnecessary or repeated variables were eliminated, like the different location variables or mostly empty attribute columns. 
 
 Many columns in User data were eliminated, as they were deemed not necessary for the analysis. Finally, data in "tip_data" and "checkin_data" was largely discarded. Information about how often a user uses the app or special tips about establishments is not important for scoring a review. After this was done, the remaining data was compiled in a merged data set that included all relevant variables.
@@ -35,7 +37,7 @@ The analysis worked through three versions of models. Version One utilized only 
 
 The analysis led to the following results, expressed in the tables below. 
 
-![Results Summary](https://github.com/bernie-being/myrepo/blob/e6ef5c7c319342ee9eb23d4d775eb17fa1e3f222/SummaryTableR.png)
+![Results Summary](SummaryTableR.png)
 
 Version 1 refers to a linear model using only the sentiment scores performed, yielding a small p-value and a Multiple R-squared of 0.1988, which is not a satisfactory result as the model can only explain 19% of the data. A lasso model was used for comparison, which confirmed a 1.114354 mean average error. However, Version Two managed to explain 46% of the variation in the star values. Further research on the subject is needed to expand this model, but this analysis narrowed down five variables that explain up to 43% of star scores in reviews through the third version of this model. This third model offered a Mean Average Error of 0.8269731, which while not perfect, is still within one star value of error and could be utilized effectively to predict star scoring. 
 
@@ -48,6 +50,9 @@ This testing revealed that the top five more important variables in the model ar
 3. "afinn_score"
 4. "user_review_count"
 5. "Business_Average_Stars".
+
+![Variable Importance](RandomForest_VariableImportance.png)
+
 
 This gives us insight into the more important factors that establishments should take into account if they decide to look at/change their reviews.
 
